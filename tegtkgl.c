@@ -35,6 +35,7 @@
 #include <GL/glx.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
+#include <glib-object.h>
 
 struct _TeGtkgl_Priv {
     GdkDisplay *disp;
@@ -107,9 +108,22 @@ te_gtkgl_realize(GtkWidget *wid)
 }
 
 static void
+te_gtkgl_finalize(GObject *obj)
+{
+    TeGtkgl *gtkgl = TE_GTKGL(obj);
+    TeGtkgl_Priv *priv = TE_GTKGL_GET_PRIV(gtkgl);
+
+    glXDestroyContext(priv->xdis, priv->glc);
+    g_clear_object((volatile GObject**)&priv->win);
+
+    G_OBJECT_CLASS(te_gtkgl_parent_class)->finalize(obj);
+}
+
+static void
 te_gtkgl_class_init(TeGtkglClass *klass)
 {
     GtkWidgetClass *wklass;
+    GObjectClass *oklass;
 
     g_type_class_add_private(klass, sizeof(TeGtkgl_Priv));
     wklass = GTK_WIDGET_CLASS(klass);
@@ -117,6 +131,10 @@ te_gtkgl_class_init(TeGtkglClass *klass)
     wklass->realize = te_gtkgl_realize;
     wklass->size_allocate = te_gtkgl_size_allocate;
     wklass->draw = te_gtkgl_draw;
+
+    oklass = (GObjectClass*)klass;
+
+    oklass->finalize = te_gtkgl_finalize;
 }
 
 static void

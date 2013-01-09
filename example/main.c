@@ -61,6 +61,7 @@ gboolean draw_the_gl(gpointer ud) {
 int main(int argc, char *argv[]) {
 
     GtkWidget *win, *cnt, *gl;
+    int i;
 
     // initialize GTK+
     gtk_init(&argc, &argv);
@@ -71,6 +72,7 @@ int main(int argc, char *argv[]) {
 
     // create the OpenGL widget
     gl = te_gtkgl_new();
+
     // set a callback that will stop the timer from drawing
     g_signal_connect(G_OBJECT(gl), "destroy", G_CALLBACK(destroy_the_gl), 0);
 
