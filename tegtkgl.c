@@ -82,42 +82,63 @@ te_gtkgl_realize(GtkWidget *wid)
     gtk_widget_set_realized(wid, TRUE);
     gtk_widget_get_allocation(wid, &allocation);
 
+    priv->disp = gdk_display_get_default();
+    priv->xdis = gdk_x11_display_get_xdisplay(priv->disp);
+    vi = glXChooseVisual(priv->xdis, 0, att);
+    priv->glc = glXCreateContext(priv->xdis, vi, 0, GL_TRUE);
+
     attributes.window_type = GDK_WINDOW_CHILD;
     attributes.x = allocation.x;
     attributes.y = allocation.y;
     attributes.width = allocation.width;
     attributes.height = allocation.height;
     attributes.wclass = GDK_INPUT_OUTPUT;
-    attributes.event_mask = gtk_widget_get_events(wid) | GDK_EXPOSURE_MASK;
-    attributes_mask = GDK_WA_X | GDK_WA_Y;
+    attributes.visual = gdk_visual_get_best_with_both(vi->depth,
+        GDK_VISUAL_DIRECT_COLOR);
+    attributes.event_mask = gtk_widget_get_events(wid);
+    attributes_mask = GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL;
 
-    priv->disp = gdk_display_get_default();
-    priv->xdis = gdk_x11_display_get_xdisplay(priv->disp);
-
-    vi = glXChooseVisual(priv->xdis, 0, att);
     priv->win = gdk_window_new(gtk_widget_get_parent_window(wid),
             &attributes, attributes_mask);
 
-    gtk_widget_set_window(wid, priv->win);
-    gtk_style_context_set_background(gtk_widget_get_style_context(wid), priv->win);
-
     priv->xwin = gdk_x11_window_get_xid(priv->win);
-    priv->glc = glXCreateContext(priv->xdis, vi, 0, GL_TRUE);
+
+    gdk_window_set_user_data(priv->win, wid);
+    gtk_widget_set_window(wid, priv->win);
+    g_object_ref(wid);
 
     te_gtkgl_send_configure(wid);
 }
 
+static void
+te_gtkgl_unrealize(GtkWidget *wid)
+{
+    TeGtkgl *gtkgl = TE_GTKGL(wid);
+    TeGtkgl_Priv *priv = TE_GTKGL_GET_PRIV(gtkgl);
+
+    if (priv->xdis) {
+        glXDestroyContext(priv->xdis, priv->glc);
+        // g_clear_object((volatile GObject**)&priv->win);
+
+        priv->xdis = NULL;
+    }
+
+    GTK_WIDGET_CLASS(te_gtkgl_parent_class)->unrealize(wid);
+}
+
+/*
 static void
 te_gtkgl_finalize(GObject *obj)
 {
     TeGtkgl *gtkgl = TE_GTKGL(obj);
     TeGtkgl_Priv *priv = TE_GTKGL_GET_PRIV(gtkgl);
 
-    glXDestroyContext(priv->xdis, priv->glc);
-    g_clear_object((volatile GObject**)&priv->win);
+    // glXDestroyContext(priv->xdis, priv->glc);
+    // g_clear_object((volatile GObject**)&priv->win);
 
     G_OBJECT_CLASS(te_gtkgl_parent_class)->finalize(obj);
 }
+*/
 
 static void
 te_gtkgl_class_init(TeGtkglClass *klass)
@@ -129,20 +150,28 @@ te_gtkgl_class_init(TeGtkglClass *klass)
     wklass = GTK_WIDGET_CLASS(klass);
 
     wklass->realize = te_gtkgl_realize;
+    wklass->unrealize = te_gtkgl_unrealize;
     wklass->size_allocate = te_gtkgl_size_allocate;
     wklass->draw = te_gtkgl_draw;
 
+    /*
     oklass = (GObjectClass*)klass;
-
     oklass->finalize = te_gtkgl_finalize;
+    */
 }
 
 static void
 te_gtkgl_init(TeGtkgl *self)
 {
-    gtk_widget_set_can_focus(GTK_WIDGET(self), TRUE);
-    gtk_widget_set_receives_default(GTK_WIDGET(self), TRUE);
-    gtk_widget_set_has_window(GTK_WIDGET(self), TRUE);
+    GtkWidget *wid = (GtkWidget*)self;
+    TeGtkgl_Priv *priv = TE_GTKGL_GET_PRIV(wid);
+
+    gtk_widget_set_can_focus(wid, TRUE);
+    gtk_widget_set_receives_default(wid, TRUE);
+    gtk_widget_set_has_window(wid, TRUE);
+    gtk_widget_set_double_buffered(wid, FALSE);
+
+    priv->xdis = NULL;
 }
 
 static void
